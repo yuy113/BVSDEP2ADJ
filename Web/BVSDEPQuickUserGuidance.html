@@ -1740,12 +1740,12 @@ variables for selection, namely <span class="math inline">\(X=(X_1,X_2)\)</span>
 <h2>Implement posterior MCMC sampling of inverse covariance and
 corresponding adjacent matrices in Matlab</h2>
 <p>In our Bayesian variable selection method, following Wang et
-al. (2014), we produce posterior samples of inverse covariance and
+al. (2015), we produce posterior samples of inverse covariance and
 corresponding adjacency matrices of all the predictors for variable
 selection, denoted as <span class="math inline">\(X\)</span>, in Matlab
 software.</p>
-<p>We recommend trying Matlab Online by accessing the following URL: .
-Copy the function <code>BayesGGM_SSVS_FixedV0V1_mod</code> and the <span class="math inline">\(X\)</span> data in TXT format, generated above in
+<p>We recommend trying Matlab Online by accessing the following URL: <a href="https://matlab.mathworks.com/" class="uri">https://matlab.mathworks.com/</a>. Copy the function
+<code>BayesGGM_SSVS_FixedV0V1_mod</code> and the <span class="math inline">\(X\)</span> data in TXT format, generated above in
 R software, along with the code that implements MCMC sampling of the
 inverse covariance and adjacency matrices of the predictors, into the
 same folder.</p>
@@ -2937,13 +2937,13 @@ observed data points.</p>
 ## ##</code></pre>
 <div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a><span class="co">#mean inclusion probability of the variable selection indicator-gamma</span></span>
 <span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a><span class="fu">apply</span>(mc_test_p20_dat[[<span class="dv">5</span>]][<span class="dv">401</span><span class="sc">:</span><span class="dv">1000</span>,],<span class="dv">2</span>, <span class="cf">function</span>(x){<span class="fu">sum</span>(x)<span class="sc">/</span>(niter<span class="dv">-400</span>)})</span></code></pre></div>
-<pre><code>##  [1] 1.00000000 0.66833333 0.21333333 0.35333333 0.66166667 1.00000000
-##  [7] 0.02500000 0.10333333 0.25333333 0.08333333 0.19833333 0.14500000
-## [13] 0.07500000 0.02000000 0.08666667 0.12833333 0.05333333 0.08666667
-## [19] 0.16333333 0.12500000</code></pre>
+<pre><code>##  [1] 1.00000000 1.00000000 0.30000000 0.23833333 0.08833333 0.28666667
+##  [7] 0.04833333 0.15833333 0.21333333 0.03833333 0.03166667 0.16833333
+## [13] 0.09833333 0.09000000 0.39500000 0.17500000 0.10833333 0.04500000
+## [19] 0.06333333 0.12833333</code></pre>
 <div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="co">#select those variables with mean inclusion probability of the variable selection indicator-gamma greater than cutoff value of 0.5</span></span>
 <span id="cb13-2"><a href="#cb13-2" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">apply</span>(mc_test_p20_dat[[<span class="dv">5</span>]][<span class="dv">401</span><span class="sc">:</span><span class="dv">1000</span>,],<span class="dv">2</span>, <span class="cf">function</span>(x){<span class="fu">sum</span>(x)<span class="sc">/</span>(niter<span class="dv">-400</span>)})<span class="sc">&gt;</span><span class="fl">0.5</span>)</span></code></pre></div>
-<pre><code>## [1] 4</code></pre>
+<pre><code>## [1] 2</code></pre>
 </div>
 <div id="contact-us-contribute" class="section level2">
 <h2>Contact Us / Contribute</h2>
