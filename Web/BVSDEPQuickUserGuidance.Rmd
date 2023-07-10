@@ -95,9 +95,9 @@ y<-sapply(prob,function(x){return(rbinom(1,size=1,prob=x))})
 
 ## Implement posterior MCMC sampling of inverse covariance and corresponding adjacent matrices in Matlab  
 
-In our Bayesian variable selection method, following Wang et al. (2014), we produce posterior samples of inverse covariance and corresponding adjacency matrices of all the predictors for variable selection, denoted as $X$, in Matlab software.
+In our Bayesian variable selection method, following Wang et al. (2015), we produce posterior samples of inverse covariance and corresponding adjacency matrices of all the predictors for variable selection, denoted as $X$, in Matlab software.
 
-We recommend trying Matlab Online by accessing the following URL: \url{https://matlab.mathworks.com/}. Copy the function `BayesGGM_SSVS_FixedV0V1_mod` and the $X$ data in TXT format, generated above in R software, along with the code that implements MCMC sampling of the inverse covariance and adjacency matrices of the predictors, into the same folder. 
+We recommend trying Matlab Online by accessing the following URL: https://matlab.mathworks.com/. Copy the function `BayesGGM_SSVS_FixedV0V1_mod` and the $X$ data in TXT format, generated above in R software, along with the code that implements MCMC sampling of the inverse covariance and adjacency matrices of the predictors, into the same folder. 
 
 To execute the function `BayesGGM_SSVS_FixedV0V1_mod` in Matlab, provide the following input parameters:
 
