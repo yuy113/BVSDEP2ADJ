@@ -1,0 +1,1278 @@
+---
+title: "Bayesian variable selection method on mixture dependence information quick user guidance"
+author: "Yubing Yao"
+date: '2023-07-03'
+output: 
+  rmdformats::robobook:
+    code_folding: show
+    toc_depth: 3
+ 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Prerequisites and Load the R porgram for MCMC sampling in our Bayesian variable selection method
+
+To run our R program for implementing MCMC sampling under our Bayesian variable selection method, we require several R packages: `BH, Rcpp, RcppEigen, RcppArmadillo, and MCMCpack`. These packages are necessary because our program incorporates C++ code. If you are using a Windows system, please ensure that you have installed `Rtool`. For Mac systems, please install `Xcode` to enable the execution of C++ programs within the R software environment.
+
+Furthermore, before running the MCMC sampling for the Bayesian variable selection method, we need to configure the values of hyperparameters. Additionally, it is essential to have the input of the known adjacent matrix of the predictors prepared beforehand. This matrix can be derived from biological pathway knowledge or other relevant sources. Ensuring these prerequisites are in place will facilitate a smooth execution of our Bayesian variable selection method.
+
+
+```{r,results='hide' }
+#please comment the below code out if you already install the packages-BH, Rcpp, RcppEigen, RcppArmadillo, and MCMCpack
+#install.packages(c("Rcpp","RcppEigen","RcppArmadillo",  "BH","MCMCpack"))
+
+
+```
+
+## Simulate data for illustration how to use our Bayesian variable selection method
+
+To illustrate our approach, we simulated data and implemented our developed Bayesian variable selection method using R and Matlab software. We designed a scenario with some variables that are truly associated with the binary outcome, while others are not. Specifically, we established a logistic model to show the association between the binary outcome variable, denoted as $Y$, and a set of predictors denoted as $X_1$. The logistic model is represented as $logit(Y) = X_1\beta_1 + Z\beta_z$, where $X_1$ consists of 6 predictors truly associated with the binary outcome. The regression coefficients $\beta_1$ can take values of 1 or 0.5.
+
+Additionally, we incorporated an important prognostic variable denoted as $Z$, which is not part of the variable selection process. $Z$ was generated from a standard normal distribution, and it was associated with a regression coefficient of $\beta_z$ equal to 2.
+
+Furthermore, we introduced another set of 14 predictors, denoted as $X_2$, which are not associated with the binary outcome. Each predictor in $X_2$ follows a standard normal distribution with a mean of 0 and a variance of 1.
+
+To generate the data for $X_1$, we assumed a multivariate normal distribution with a mean vector of zeros and a covariance matrix containing diagonal entries of 1 and non-zero off-diagonal entries of 0.3. Subsequently, we created the binary outcome by modeling it as a Bernoulli distribution with the parameter $p = \frac{{\exp(X_1\beta_1 + \beta_zZ)}}{{1 + \exp(X_1\beta_1 + \beta_zZ)}}$. This formulation incorporates the effects of both $X_1$ and $Z$ on the probability of the binary outcome.
+
+As a result, we obtained a simulated example dataset $(Y, X, Z)$, where $X$ represents the combined set of variables for selection, namely $X=(X_1,X_2)$.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+#require R package of MASS to simulate multivariate normal distribution
+library(MASS)
+
+  
+n.obs=100
+cov_x<-diag(20)
+for (i in 1:6){
+  for ( j in 1: 6){
+    if (i != j){
+      cov_x[i,j]<-0.3
+    }
+    
+  }
+  
+}
+
+
+mu1=rep(0,6)
+
+#frist 6 predictors, truly associated with the outcome-y
+#multivariate normal distribution with mean 0 and covariance matrix generated above
+X1<-mvrnorm(n = n.obs, mu=mu1, Sigma=cov_x[1:6,1:6])
+#covariance matrix of other 14 noisy predictors
+#assume independent standard normal distribution
+X2<-matrix(rnorm(14*n.obs),ncol=14)
+#design matrix of all 20 predictors
+X<-cbind(X1,X2)
+write.table(X, file = "X_dat.txt", row.names = FALSE,col.names=FALSE)
+beta<-c(1,1,1,0.5,0.5,0.5)
+Z_dat<-rnorm(100)
+beta_Z<-2
+beta_tot<-c(beta,beta_Z)
+X_tot<-cbind(X1,Z_dat)
+prob<-exp(X_tot%*%beta_tot)/(1+exp(X_tot%*%beta_tot))
+#binary outcome-Y
+y<-sapply(prob,function(x){return(rbinom(1,size=1,prob=x))})
+
+#pval.edge
+```
+
+## Implement posterior MCMC sampling of inverse covariance and corresponding adjacent matrices in Matlab  
+
+In our Bayesian variable selection method, following Wang et al. (2014), we produce posterior samples of inverse covariance and corresponding adjacency matrices of all the predictors for variable selection, denoted as $X$, in Matlab software.
+
+We recommend trying Matlab Online by accessing the following URL: \url{https://matlab.mathworks.com/}. Copy the function `BayesGGM_SSVS_FixedV0V1_mod` and the $X$ data in TXT format, generated above in R software, along with the code that implements MCMC sampling of the inverse covariance and adjacency matrices of the predictors, into the same folder. 
+
+To execute the function `BayesGGM_SSVS_FixedV0V1_mod` in Matlab, provide the following input parameters:
+- `S`: Cross-product matrix of the observed predictor data ($XX^T$).
+- `n`: Number of observations.
+- `Sig`: Initial guess of the standard deviation ($\sigma$) for assumed normal distribution of the predictors.
+- `V0`: Initial small variance component of the predictors.
+- `V1`: Initial large variance component of the predictors.
+- $\lambda$: Hyperparameter for the diagonal elements of the inverse covariance matrix of the predictors (usually set to 1).
+- `pii`: Prior marginal edge inclusion probability.
+- `burnin`: Number of posterior samples during the burn-in period.
+- `nmc`: Number of posterior samples to be saved.
+
+Running the function will generate `nmc` posterior samples of the adjacency matrix in TXT format, which represent the dependent structure information of the predictors ($X$) obtained from the observed data.
+
+The output from this function will provide posterior samples of the adjacency matrix, capturing the dependence structure of the variables for selection ($X$), derived from the observed data.
+
+
+```{r,eval=FALSE}
+#the below is Matlab function-BayesGGM_SSVS_FixedV0V1_mod to implement MCMC sampling of inverse convariance and corresponding adjacent matrices based on observed data of the predictors for variable selection-X
+
+
+function Z_save = BayesGGM_SSVS_FixedV0V1_mod(S,n,Sig,V0,V1,lambda,pii,burnin,nmc,seed)
+
+%% BayesGGM_SSVS_FixedV0V1 fits SSSL (Wang 2014) to a concentration graph models
+%% Input:
+%%   S: p x p cross product matrix:  Y*Y' if Y is a p x n matrix of random sample
+%%   n: sample size
+%%   Sig: initial guess of Sigma
+%%   V0:  p x p matrix of the  small variance  components;  V0(i,j) is the small variance of the precision element C(i,j)
+%%   V1:  p x p matrix of the  large variance  components;  V0(i,j) is the small variance of the precision element C(i,j)
+%%   lambda: hyperparameter for the diagonal element Usually set to be 1;
+%%   pii: prior marginal edge "inclusion probability"
+%%   burnin: # of discarded samples
+%%   nmc: # of saved samples
+
+%% Output:
+%%  Z_save: p x p x nmc saved graph indicator matrices
+
+ C = inv(Sig);
+ p = size(S,1); 
+
+
+ 
+
+
+ %C_save = zeros(p,p,nmc); Sig_save = C_save; 
+ Z_save = zeros(p,p,1); 
+ Z =  ones(p);
+
+
+
+ tau = V1;
+
+
+
+ind_noi_all = zeros(p-1,p);
+
+
+for i = 1:p
+       if i==1  
+       ind_noi = [2:p]'; 
+      elseif i==p
+       ind_noi = [1:p-1]'; 
+      else
+       ind_noi = [1:i-1,i+1:p]';
+       end
+       ind_noi_all(:,i) = ind_noi;
+       
+end
+
+
+pii_RB = zeros(p);
+pii_mat = zeros(p);
+
+
+%grid1 = [0:0.05:100];
+%grid2 = [-60:0.05:60];
+
+%%logd_offdiag_save = zeros(nmc,length(grid2));
+%%logd_diag_save  = zeros(nmc,length(grid1));
+
+for iter = 1: burnin+nmc    
+            
+       if(mod(iter,3000)==0)
+        fprintf('iter = %d nedge = %d \n',iter, (sum(Z(:))-p)/2);
+       end
+    
+%%% sample Sig and C = inv(Sig)        
+    for i = 1:p
+
+
+      ind_noi = ind_noi_all(:,i);
+ 
+       
+      tau_temp = tau(ind_noi,i);
+       
+      Sig11 = Sig(ind_noi,ind_noi); Sig12 = Sig(ind_noi,i);
+      
+      invC11 = Sig11 - Sig12*Sig12'/Sig(i,i);
+      
+      Ci = (S(i,i)+lambda)*invC11+diag(1./tau_temp);
+  
+      Ci = (Ci+Ci')./2;       
+      Ci_chol = chol(Ci);    
+      mu_i = -Ci_chol\(Ci_chol'\S(ind_noi,i));
+        beta = mu_i+ Ci_chol\randn(p-1,1);
+        
+        
+        C(ind_noi,i) = beta;
+        C(i,ind_noi) = beta;
+        
+        a_gam = 0.5*n+1;
+        b_gam = (S(i,i)+lambda)*0.5;
+        gam = gamrnd(a_gam,1/b_gam);
+        
+        c = beta'*invC11*beta;
+        C(i,i) = gam+c;
+    
+
+        
+        
+        
+        %% Below updating Covariance matrix according to one-column change of precision matrix
+        invC11beta = invC11*beta;
+        
+        Sig(ind_noi,ind_noi) = invC11+invC11beta*invC11beta'/gam;
+        Sig12 = -invC11beta/gam;
+        Sig(ind_noi,i) = Sig12;
+        Sig(i,ind_noi) = Sig12';
+        Sig(i,i) = 1/gam;
+
+        
+        
+              
+         v0 = V0(ind_noi,i);
+         v1 = V1(ind_noi,i);
+                
+        w1 = -0.5*log(v0) -0.5*beta.^2./v0+log(1-pii);
+        w2 = -0.5*log(v1) -0.5*beta.^2./v1+log(pii);
+        
+        w_max = max([w1,w2],[],2);
+
+        w = exp(w2-w_max)./sum(exp([w1,w2]-repmat(w_max,1,2)),2);
+
+        z = (rand(p-1,1)<w);
+        
+        
+        v = v0;
+        v(z) = v1(z);
+        
+        
+        
+      
+        
+        pii_mat(ind_noi,i) = w;
+        
+        tau(ind_noi,i) = v;        
+        tau(i,ind_noi) = v;
+
+        Z(ind_noi,i) = z;
+        Z(i,ind_noi) = z;
+
+        
+        
+    end
+
+    
+    
+
+      
+       if iter >burnin   
+            pii_RB = pii_RB + pii_mat/nmc; 
+       
+            dlmwrite(strcat('met_p_',int2str(seed),'_cov_',int2str(iter-burnin),'.txt'),Z,'delimiter','\t');
+            Z_save(:,:) = Z;            
+
+    
+
+       end
+
+
+
+end
+
+
+#the below is Matlab code to run BayesGGM_SSVS_FixedV0V1_mod function to implement MCMC sampling of inverse convariance and corresponding adjacent matrices based on observed data of the predictors for variable selection-X, and beforehand we need load the X txt file and set initial values of the hyperparameters.
+
+
+
+
+
+%set up the random seed 
+seed=512;
+% load observation data for the predictors 
+X1 = load('/MATLAB Drive/data/X_dat.txt');
+
+%covariance for X1
+S1=X1'*X1;
+%covariance for X2
+%S2=X2*X2';
+
+%other hyperparameters setup in this simulation scenario with p=100
+
+%% Fix some hyperparameters
+  h = 50^2; v0 = 0.015^2; v1 = h*v0;
+  p=20;
+  n=100;
+  lambda = 1; pii = 6/(p-1); 
+  V0 = v0*ones(p); V1 = v1*ones(p); burnin = 100; nmc =1000;
+  rng(seed);
+ % output the posterior samples of adjacent matrix in txt format
+ Z_save1 = BayesGGM_SSVS_FixedV0V1_mod2(S1,n,eye(p),V0,V1,lambda,pii,burnin,nmc,seed);
+ 
+```
+
+
+## MCMC sampling of all parameters in our Bayesian variable selection method
+
+
+In our developed Bayesian variable selection method, we incorporate the dependence structure among variables from external biological information or other sources, as well as the dependence information from observed data. This is achieved by utilizing two adjacency matrices to enhance the efficiency of Bayesian variable selection compared to using a single source of dependence structure (Stingo et al. 2011).
+
+We create the adjacency matrix adj1_X, which represents partial information about the true dependence structure among all variables for selection. The other set of dependence structures for the variables is obtained from the posterior samples of the adjacency matrix generated through the MCMC sampling in Matlab.
+
+Before running the Bayesian MCMC sampling for all the parameters in the Bayesian model setup, we need to copy the posterior samples of the adjacency matrix generated from the Matlab output in TXT format and the C++ program MollerRand2eta_random.cpp into the same folder directory where you run your R program. Additionally, we need to input a set of hyperparameters with fixed values, such as $\nu_0$, $h_{\tau}$, $\sigma^2_0$, $h$, $\mu$, $e$, $f$, $\eta_{sd}$, $\alpha_0$, $\tau_0$, $\beta_0$, $T_{\text{max}}$, $\mu_{\tilde{\eta}}$, $\tilde{\eta}_1$, $\tilde{\eta}_2$, as well as the number of iterations for the MCMC sampling (niter). Special attention should be given to $\mu$, which controls the sparsity of the variables for selection, and $\tilde{\eta}_1$ and $\tilde{\eta}_2$, which are the weights for the two adjacency matrices in the prior distribution of variable selection indicators-$\gamma$, representing the dependence structure information for the variables for selection ($X$), respectively.
+
+The function bayanal3_FBE is used to implement the full Bayesian MCMC sampling for variable selection. It requires the following inputs: the observed data of the variables for selection (`design`), the observed binary outcome (`y`), the observed data of additional prognostic variable(s) (`z_dat`), the fixed adjacency matrix (`R`), the random seed (`seed`), and the folder address (`file_address`) to read the posterior samples of the adjacency matrix from the observed data of $X$. The output of the function is the posterior samples of all the parameters obtained from the MCMC sampling procedure.
+
+Typically, we select variables with an empirical posterior inclusion probability greater than a certain cutoff value. A commonly used cutoff value is 0.5, where the empirical posterior inclusion probability is calculated as the frequency of the variable selection indicators ($\gamma==1$) from the posterior samples of $\gamma$, after removing the posterior samples in burn-in period.
+
+Please note that in our illustrated example, we use a relatively small number of iterations for the MCMC sampling (`niter` equal to 1000) for convenience. In real use, we recommend using a larger number of iterations, typically ranging from 10,000 to 1,000,000, depending on the number of variables for selection and the number of observed data points.
+
+
+
+
+```{r,eval=FALSE}
+######################################################################################
+#C++ program-MollerRand2eta_random.cpp below
+// [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::depends(BH)]]
+
+#include <RcppArmadillo.h>
+#include <boost/random.hpp>
+#include <boost/random/uniform_real_distribution.hpp>
+#include <boost/random/normal_distribution.hpp>
+#include <boost/random/gamma_distribution.hpp>
+#include <boost/random/bernoulli_distribution.hpp>
+#include <boost/random/beta_distribution.hpp>
+//#include <math.h>
+//#include <cmath>
+
+
+
+
+
+using namespace std;
+using namespace arma;
+using namespace Rcpp;
+using namespace boost;
+namespace br = boost::random;
+
+
+// [[Rcpp::export]]
+void set_seed(unsigned int seed) {
+  Rcpp::Environment base_env("package:base");
+  Rcpp::Function set_seed_r = base_env["set.seed"];
+  set_seed_r(seed);  
+}
+
+namespace normal_func {
+
+    // Returns the erf() of a value (not super precise, but ok)
+    double erf(double x)
+    {  
+     double y = 1.0 / ( 1.0 + 0.3275911 * x);   
+     return 1 - (((((
+            + 1.061405429  * y
+            - 1.453152027) * y
+            + 1.421413741) * y
+            - 0.284496736) * y 
+            + 0.254829592) * y) 
+            * exp (-x * x);      
+    }
+
+    // Returns the probability of x, given the distribution described by mu and sigma.
+    double pdf(double x, double mu, double sigma)
+    {
+      //Constants
+      static const double pi = 3.14159265; 
+      return exp( -1 * (x - mu) * (x - mu) / (2 * sigma * sigma)) / (sigma * sqrt(2 * pi));
+    }
+
+    // Returns the probability of [-inf,x] of a gaussian distribution
+    double cdf(double x, double mu, double sigma)
+    {
+        return 0.5 * (1 + normal_func::erf((x - mu) / (sigma * sqrt(2.))));
+    }
+
+    //generate random number with normal distribution-N(mu,sigma^2)
+    double rnorm(double mu, double sigma, boost::mt19937& rng){
+            boost::normal_distribution<> nd(mu, sigma);
+            boost::variate_generator<boost::mt19937&, 
+                           boost::normal_distribution<> > var_nor(rng, nd);
+            return var_nor();
+
+    }
+}
+
+
+double runif(double min,double max,boost::mt19937& rng){
+            br::uniform_real_distribution< > unif(min, max);
+            boost::variate_generator<boost::mt19937&, 
+                           br::uniform_real_distribution<> > var_unif( rng,unif);
+            return var_unif();
+            
+}
+
+
+double rbeta(double e,double f,boost::mt19937& rng){
+            br::beta_distribution< > beta_dist(e, f);
+            boost::variate_generator<boost::mt19937&, 
+                           br::beta_distribution<> > var_beta(rng, beta_dist);
+            return var_beta();
+            
+}
+
+
+
+
+
+
+
+namespace betagamma_func {
+  //return the log beta density of shape,scale
+  double pdfbeta_log (double x, double s1, double s2){
+
+    return lgamma(s1+s2)-lgamma(s1)-lgamma(s2)+(s1-1)*log(x)+(s2-1)*log(1-x);
+  }
+  // return the log gamma density of shape-s, rate-r
+  double pdfgamma_log (double x, double s, double r){
+
+    return s*log(r)-lgamma(s)+(s-1)*log(x)-r*x;
+  }
+  // return the log inverse-gamma density of shape-s, rate-r
+  double pdfinvgamma_log(double x, double s, double r){
+     
+     return s*log(r)-lgamma(s)-(s+1)*log(x)-r/x;
+
+  }
+
+  double rgamma( double shape, double rate, boost::mt19937& rng ) {
+      double scale=1/rate;
+      boost::gamma_distribution<> gd( shape );
+      boost::variate_generator<boost::mt19937&,boost::gamma_distribution<> > var_gamma( rng, gd );
+      return scale*var_gamma();
+    }
+
+  double rinvgamma(double shape, double rate, boost::mt19937& rng){
+
+  	 return 1.0/betagamma_func::rgamma( shape,  rate,  rng);
+  }
+}
+
+
+
+//For variant Markov Random Field prior with two random eta-eta_1,eta_2 for predictor indication variable-Gamma
+//incoporating two sources of depedence structures(information) among all the p possible dependent predictors
+//where p>>n, n the number of observations 
+//apply the similar tenique in Stingo et al 2011 and Moller et al. 2006 
+//introduce two additional auxiliary variables-omega_1,omega_2 corresponding to two random eta's-eta_1,eta_2
+//Two omega's are generated by perfect simulation using Propp-Wilson exact sampling with reverse order coupled Markov chain 1996
+//where the marginal distribution of two omega's are following also MRF distribution with some values of mu and eta's
+//Propp-Wilson exact sampling algorithm to generate the auxiliary variable omega for random eta sampling
+//input 1: the first dependence adjacent p by p matrix-R1 
+//corresponding to first source of dependence information for p predictors
+//input 2: the second dependence adjacent p by p matrix-R2 
+//corresponding to first source of dependence information for p predictors
+//input 3: the parameter-mu in MRF variant prior distribution 
+//input 4: the parameter-eta1 in MRF variant prior distribution 
+//input 5: the parameter-eta2 in MRF variant prior distribution 
+//input 6: T_max the maximum value of T to avoid infinite cycling in reverse coupled Markov chain sampling
+IntegerVector proppwilson_omega(IntegerMatrix R1, IntegerMatrix R2, double mu, double eta1, double eta2,unsigned int T_max){
+     if (R1.ncol()!=R1.nrow()) stop("input R1 matrix must be square matrix");
+     if (R2.ncol()!=R2.nrow()) stop("input R2 matrix must be square matrix");
+     if (R1.ncol()!=R2.nrow()) stop("input R1 and R2 matrices must have same dimension");
+     unsigned int p=R1.ncol(),T=2;
+     int seed2;
+     double u;
+      //initialize two up and down vectors with values 0 and 1 respectively with the length-p
+     int seed=floor(R::runif(0.0,1.0)*1000)+1;
+     double ker_ind_up, pi_up_ind,u2;
+     //initialize two up and down vectors with values 0 and 1 respectively with the length-p
+     IntegerVector x_up(p,0),x_down(p,1);
+     NumericVector pi_ker_up_i(p),pi_ker_down_i(p),pi_up(p),pi_down(p);
+     unsigned int kk_difsum,kk_tmp,kk_one,kk_zero,k_tmp,len_zero;
+     IntegerVector one_tmp(p);
+ //    br::uniform_real_distribution< >  uniform_dist01(0.0,1.0);
+     while (sum(x_up != x_down)>0) {
+       for (unsigned int k=0; k < p; k++){
+              x_up[k]=0;
+              x_down[k]=1;
+
+        }
+      for (int t=-T;t <= -1; t++){ 
+        for (unsigned int k=0; k < p; k++){
+              pi_ker_up_i[k]=0.0;
+              pi_ker_down_i[k]=0.0;
+
+        }
+         seed2=-t*seed;
+         br::mt19937 generator(seed2);
+         //br::uniform_real_distribution< >  uniform_dist01(0.0,1.0);
+         //pi_ker_up_i(p,0.0),pi_ker_down_i(p,0.0),pi_up(p,0.0),pi_down(p,0.0);
+         for (unsigned int i=0; i < p; i++){           
+            for (unsigned int j=0; j < p; j++){
+            	 pi_ker_up_i[i] =pi_ker_up_i[i] + eta1*R1(i,j)*x_up[j]+eta2*R2(i,j)*x_up[j];
+            	 pi_ker_down_i[i] =pi_ker_down_i[i]+ eta1*R1(i,j)*x_down[j]+eta2*R2(i,j)*x_down[j];
+            }
+            pi_up[i]=1/(1+1/(exp(mu+pi_ker_up_i[i])));
+            pi_down[i]=1/(1+1/(exp(mu+pi_ker_down_i[i]))); 
+           // br::mt19937 generator(seed2);
+           // br::uniform_real_distribution< >  uniform_dist01(0.0,1.0);
+            u=runif(0.0,1.0,generator);         
+            if (pi_up[i] > u){
+               x_up[i]=1;
+            }
+            else {
+               x_up[i]=0;
+            }
+            if (pi_down[i] <= u){
+               x_down[i]=0;
+            }
+            else {
+               x_down[i]=1;
+            }
+         }
+         
+      }
+      T=2*T;
+      len_zero=0;
+      for (unsigned int k=0; k < p; k++ ){                 
+                 if (!((pi_down[k]==1) && (pi_up[k]==1))){
+                  len_zero++;
+                 }
+      }
+      IntegerVector zero_tmp(len_zero);
+      if (T >= T_max) {
+          k_tmp=0;
+          for (unsigned int k=0; k < p; k++ ){
+                 one_tmp[k]=pi_down[k]*pi_up[k];
+                 if (!((pi_down[k]==1) && (pi_up[k]==1))){
+                  zero_tmp[k_tmp]=1-pi_down[k]-pi_up[k];
+                  k_tmp++;
+                 }
+                 
+          }
+          kk_one=sum(one_tmp);
+          kk_zero=sum(zero_tmp);
+          kk_difsum=p-kk_one-kk_zero;
+          IntegerVector index_diff(kk_difsum);
+          kk_tmp=0;
+          for (unsigned int k=0; k < p; k++ ){           
+            if (one_tmp[k]==0 && zero_tmp[k]==0){
+                 index_diff[kk_tmp]=k;
+                 kk_tmp++;
+             }                              
+          }
+          br::mt19937 generator(seed2);
+          for (unsigned int l=0; l < 100; l++){
+             for (unsigned int m=0; m < kk_difsum; m++){
+                 ker_ind_up=0.0;
+                 for (unsigned int k=0; k < p; k++){
+                   ker_ind_up += eta1*R1(index_diff[m],k)*x_up[k]+eta2*R2(index_diff[m],k)*x_up[k];  
+                 }
+                 pi_up_ind=1/(1+1/exp(mu+ker_ind_up));
+                //br::mt19937 generator(seed2);
+              //  br::uniform_real_distribution< >  uniform_dist01(0.0,1.0);
+                 u2=runif(0.0,1.0,generator);
+                 if (pi_up_ind > u2){
+                  x_up[index_diff[m]]=1;
+                 }
+                 else {
+                  x_up[index_diff[m]]=0;
+
+                 }
+             }
+
+          }                  
+          x_down=x_up;
+      }  
+               
+    }
+  return x_up;
+  }
+/*
+//the log density function for the prior of two parameterseta1,eta2 in variant MRF
+//where eta1(2)/eta_sd\sim Beta(e,f), where e,f are two hyperparameters
+//input 1: the value of the parameter-eta1(2)
+//input 2 and 3: e,f are two hyperparameters in prior beta distribution
+//input 4: eta_sd: the value of phase transition of eta1(2)
+// [[Rcpp::export]]
+double pri2eta_beta(double eta,double e, double f, double eta_sd){
+	if (eta>eta_sd) stop("the value of eta can't be larger than phase transition eta");
+    double logdenbeta=std::log(R::dbeta(eta/eta_sd,e,f,0));
+	return logdenbeta;
+}
+
+//wrap the function-pri2eta_beta
+// pri2eta_beta
+double pri2eta_beta(double eta,double e, double f, double eta_sd);
+RcppExport SEXP pri2eta_beta(SEXP etaSEXP, SEXP eSEXP, SEXP fSEXP,SEXP eta_sdSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject __result;
+    Rcpp::RNGScope __rngScope;
+    Rcpp::traits::input_parameter< double >::type eta(etaSEXP);
+    Rcpp::traits::input_parameter< double >::type e(eSEXP);
+    Rcpp::traits::input_parameter< double >::type f(fSEXP);
+     Rcpp::traits::input_parameter< double >::type eta_sd(eSEXP);
+    __result = Rcpp::wrap(pri2eta_beta(eta,e,f,eta_sd));
+    return __result;
+END_RCPP
+}
+
+*/
+
+
+
+
+
+/*
+//update two eta's based on uniform transitional kernel q(eta_new|eta)
+//apply auxiliary variable-omega_i for eta_i,i=1,2 in Moller et al. 2006
+//input: Gamma: the vector of the elements, which are the index of predictors with indicator variable gamma equal to 1
+//input 1: the first dependence adjacent p by p matrix-R1 
+//corresponding to first source of dependence information for p predictors
+//input 2: the second dependence adjacent p by p matrix-R2 
+//corresponding to first source of dependence information for p predictors
+//input 3: the parameter-mu in MRF variant prior distribution 
+//input 4: the parameter-eta1 in MRF variant prior distribution 
+//input 5: the parameter-eta2 in MRF variant prior distribution 
+//input 6: T_max the maximum value of T to avoid infinite cycling in reverse coupled Markov chain sampling
+input 7: mu_tilde
+input 8: eta_tilde
+input 9: eta_sd the value of the parameter-eta1(2) at phase transition 
+input 10: Gamma: the vector of the elements, which are the index of predictors with indicator variable gamma equal to 1
+input 11, 12: e, f the two hyperparameters of prior beta distribution of the two parameters-eta1(2)
+input 13: function proppwilson_omega, generate omega auxiliary variable for eta sampling through perfect simulation through
+Propp-Wilson exact sampling with reverse order coupled Markov chain 1996
+where the marginal distribution of two omega's are following also MRF distribution with some values of mu and eta's
+input 14: pri2eta_beta-log density function for prior beta(e,f) distribution of the two parameters-eta1, eta2
+*/
+// [[Rcpp::export]]
+List moller_2eta_unif(IntegerMatrix R1, IntegerMatrix R2, double mu, double eta1, double eta2,unsigned int T_max,
+       double mu_tilde,double eta1_tilde,double eta2_tilde,double eta_sd,IntegerVector gamma,double e, double f){
+  	   int seed=floor(R::runif(0.0,1.0)*1000)+1;
+  	  // br::mt19937 generator(seed);
+  	  // br::uniform_real_distribution< >  uniform_dist01(0.0,1.0);
+       if (R1.ncol()!=R1.nrow()) stop("input R1 matrix must be square matrix");
+       if (R2.ncol()!=R2.nrow()) stop("input R2 matrix must be square matrix");
+       if (R1.ncol()!=R2.nrow()) stop("input R1 and R2 matrices must have same dimension");
+       if (eta1 > eta_sd) stop("input eta1 value should be smaller than phase transition value");
+       if (eta2 > eta_sd) stop("input eta2 value should be smaller than phase transition value");
+       unsigned int p=R1.ncol();
+       double a1=std::max(0.0,eta1-0.01),b1=std::min(eta_sd,eta1+0.01);
+       br::mt19937 generator(seed);
+      // br::uniform_real_distribution< >  uniform_dista1b1(a1,b1);
+       double eta1_new=runif(a1,b1,generator);
+       double a2=std::max(0.0,eta2-0.01),b2=std::min(eta_sd,eta2+0.01);
+       //br::uniform_real_distribution< >  uniform_dista2b2(a2,b2);
+       double eta2_new=runif(a2,b2,generator);
+       double u1,u2;
+
+       IntegerVector omega_eta1=proppwilson_omega(R1,R2,mu,eta1,eta2,T_max);
+       IntegerVector omega_eta2=proppwilson_omega(R1,R2,mu,eta1,eta2,T_max);
+       IntegerVector omega_eta1new=proppwilson_omega(R1,R2,mu,eta1_new,eta2,T_max);
+       IntegerVector omega_eta2new=proppwilson_omega(R1,R2,mu,eta1,eta2_new,T_max);
+       //IntegerVector omega_eta1=lomega_eta1[1],omega_eta2=lomega_eta2[1],omega_eta1new=lomega_eta1new[1],omega_eta2new=lomega_eta2new[1];
+       int A_eta1new_R1=0,A_eta2new_R1=0,A_eta1_R1=0,A_eta2_R1=0,A_eta1_R2=0,A_eta2_R2=0;
+       int A_eta1new_R2=0,A_eta2new_R2=0, B_eta_R1=0,B_eta_R2=0;
+       int sum_omega_eta1=0,sum_omega_eta2=0,sum_omega_eta1new=0,sum_omega_eta2new=0;
+       for (unsigned int j=0; j < p; j++){
+          sum_omega_eta1 += omega_eta1[j];
+          sum_omega_eta2 += omega_eta2[j];
+          sum_omega_eta1new += omega_eta1new[j];
+          sum_omega_eta2new += omega_eta2new[j];
+          for (unsigned int k=0; k < p; k++){
+            A_eta1new_R1 += omega_eta1new[j]*R1(j,k)*omega_eta1new[k];
+            A_eta1new_R2 += omega_eta1new[j]*R2(j,k)*omega_eta1new[k];
+            A_eta2new_R1 += omega_eta2new[j]*R1(j,k)*omega_eta2new[k];
+            A_eta2new_R2 += omega_eta2new[j]*R2(j,k)*omega_eta2new[k];
+            A_eta1_R1 += omega_eta1[j]*R1(j,k)*omega_eta1[k];
+            A_eta1_R2 += omega_eta1[j]*R2(j,k)*omega_eta1[k];
+            A_eta2_R1 += omega_eta2[j]*R1(j,k)*omega_eta2[k];
+            A_eta2_R2 += omega_eta2[j]*R2(j,k)*omega_eta2[k];
+            B_eta_R1 += gamma[j]*R1(j,k)*gamma[k];
+            B_eta_R2 += gamma[j]*R2(j,k)*gamma[k];
+
+          }
+        }
+        double priden_eta1new=betagamma_func::pdfbeta_log(eta1_new/eta_sd,e,f);
+        double priden_eta1=betagamma_func::pdfbeta_log(eta1/eta_sd,e,f);
+        double priden_eta2new=betagamma_func::pdfbeta_log(eta2_new/eta_sd,e,f);
+        double priden_eta2=betagamma_func::pdfbeta_log(eta2/eta_sd,e,f);     
+        double MHratio_eta1=(eta1_new-eta1)*B_eta_R1+priden_eta1new-priden_eta1+mu_tilde*(sum_omega_eta1new-sum_omega_eta1)
+            +eta1_tilde*(A_eta1new_R1-A_eta1_R1)+eta2_tilde*(A_eta1new_R2-A_eta1_R2);
+        double MHratio_eta2=(eta2_new-eta2)*B_eta_R2+priden_eta2new-priden_eta2+mu_tilde*(sum_omega_eta2new-sum_omega_eta2)
+          +eta1_tilde*(A_eta2new_R1-A_eta2_R1)+eta2_tilde*(A_eta2new_R2-A_eta2_R2);
+        double c1=std::max(0.0,eta1_new-0.01),d1=std::min(eta1_new+0.01,eta_sd);
+        double c2=std::max(0.0,eta2_new-0.01),d2=std::min(eta2_new+0.01,eta_sd);
+        double prop_eta1=log(b1-a1)-log(d1-c1)+mu*(sum_omega_eta1-sum_omega_eta1new)
+               +eta1*A_eta1_R1-eta1_new*A_eta1new_R1+eta2*(A_eta1_R2-A_eta1new_R2);
+        double prop_eta2=log(b2-a2)-log(d2-c2)+mu*(sum_omega_eta2-sum_omega_eta2new) 
+               +eta2*A_eta2_R2-eta2_new*A_eta2new_R2+eta1*(A_eta2_R1-A_eta2new_R1);
+        double logMHratio_eta1=MHratio_eta1+prop_eta1;
+        double logMHratio_eta2=MHratio_eta2+prop_eta2;
+     //   br::mt19937 generator(seed);
+       // br::uniform_real_distribution< >  uniform_dist01(0.0,1.0);
+        u1=runif(0.0,1.0,generator),u2=runif(0.0,1.0,generator);
+        if (log(u1) < logMHratio_eta1){
+            eta1=eta1_new;
+            omega_eta1=omega_eta1new;
+        }
+        if (log(u2) < logMHratio_eta2){
+            eta2=eta2_new;
+            omega_eta2=omega_eta2new;
+        }
+        return List::create(
+               _["eta1"] = eta1, 
+               _["omega_eta1"] = omega_eta1,
+               _["eta2"] = eta2, 
+               _["omega_eta2"] = omega_eta2
+                );
+
+
+     }
+
+
+    // moller_2eta_unif
+
+
+
+/*
+//update two eta's based on positive truncated normal transitional kernel q(eta_new|eta)
+//between 0 and eta_sd, phase transition value of the two parameters-eta1 and eta2
+//apply auxiliary variable-omega_i for eta_i,i=1,2 in Moller et al. 2006
+//input: Gamma: the vector of the elements, which are the index of predictors with indicator variable gamma equal to 1
+//input 1: the first dependence adjacent p by p matrix-R1 
+//corresponding to first source of dependence information for p predictors
+//input 2: the second dependence adjacent p by p matrix-R2 
+//corresponding to first source of dependence information for p predictors
+//input 3: the parameter-mu in MRF variant prior distribution 
+//input 4: the parameter-eta1 in MRF variant prior distribution 
+//input 5: the parameter-eta2 in MRF variant prior distribution 
+//input 6: T_max the maximum value of T to avoid infinite cycling in reverse coupled Markov chain sampling
+input 7: mu_tilde
+input 8: eta_tilde
+input 9: eta_sd the value of the parameter-eta1(2) at phase transition 
+input 10: Gamma: the vector of the elements, which are the index of predictors with indicator variable gamma equal to 1
+input 11, 12: e, f the two hyperparameters of prior beta distribution of the two parameters-eta1(2)
+input 13: function proppwilson_omega, generate omega auxiliary variable for eta sampling through perfect simulation through
+Propp-Wilson exact sampling with reverse order coupled Markov chain 1996
+where the marginal distribution of two omega's are following also MRF distribution with some values of mu and eta's
+input 14: pri2eta_beta-log density function for prior beta(e,f) distribution of the two parameters-eta1, eta2
+*/
+// [[Rcpp::export]]    
+List moller_2eta_trnormal(IntegerMatrix R1, IntegerMatrix R2, double mu, double eta1, double eta2,unsigned int T_max,
+         double mu_tilde,double eta1_tilde,double eta2_tilde,double eta_sd,IntegerVector gamma,double e, double f){
+    if (R1.ncol()!=R1.nrow()) stop("input R1 matrix must be square matrix");
+    if (R2.ncol()!=R2.nrow()) stop("input R2 matrix must be square matrix");
+    if (R1.ncol()!=R2.nrow()) stop("input R1 and R2 matrices must have same dimension");
+    if (eta1 > eta_sd) stop("input eta1 value should be smaller than phase transition value");
+    if (eta2 > eta_sd) stop("input eta2 value should be smaller than phase transition value");
+    //generate the new eta1, eta2 based on truncated normal distribution with mean-eta1,eta2, sd-eta_sd
+    int seed=floor(R::runif(0.0,1.0)*1000000)+1;
+  	br::mt19937 generator(seed);
+
+    unsigned int atap1=0,atap2=0;
+    double eta1_new,eta2_new;
+  //  boost::normal_distribution<double> normdist_eta1(eta1,eta_sd);
+   // boost::normal_distribution<double> normdist_eta2(eta2,eta_sd);
+    while (atap1==0){
+       eta1_new = normal_func::rnorm(eta1,eta_sd,generator);   
+       if (eta1_new > 0 && eta1_new < eta_sd){
+        atap1=1;
+       }
+    }
+    while (atap2==0){
+       eta2_new = normal_func::rnorm(eta2,eta_sd,generator); ;   
+       if (eta2_new > 0 && eta2_new < eta_sd){
+        atap2=1;
+       }
+    }
+
+    unsigned int p=R1.ncol();
+    double u1,u2;
+    IntegerVector omega_eta1=proppwilson_omega(R1,R2,mu,eta1,eta2,T_max);
+    IntegerVector omega_eta2=proppwilson_omega(R1,R2,mu,eta1,eta2,T_max);
+    IntegerVector omega_eta1new=proppwilson_omega(R1,R2,mu,eta1_new,eta2,T_max);
+    IntegerVector omega_eta2new=proppwilson_omega(R1,R2,mu,eta1,eta2_new,T_max);
+    //IntegerVector omega_eta1=lomega_eta1[1],omega_eta2=lomega_eta2[1],omega_eta1new=lomega_eta1new[1],omega_eta2new=lomega_eta2new[1];
+    int A_eta1new_R1=0,A_eta2new_R1=0,A_eta1_R1=0,A_eta2_R1=0,A_eta1_R2=0,A_eta2_R2=0;
+    int A_eta1new_R2=0,A_eta2new_R2=0, B_eta_R1=0,B_eta_R2=0;
+    int sum_omega_eta1=0,sum_omega_eta2=0,sum_omega_eta1new=0,sum_omega_eta2new=0;
+    for (unsigned int j=0; j < p; j++){
+          sum_omega_eta1 += omega_eta1[j];
+          sum_omega_eta2 += omega_eta2[j];
+          sum_omega_eta1new += omega_eta1new[j];
+          sum_omega_eta2new += omega_eta2new[j];
+          for (unsigned int k=0; k < p; k++){
+            A_eta1new_R1 += omega_eta1new[j]*R1(j,k)*omega_eta1new[k];
+            A_eta1new_R2 += omega_eta1new[j]*R2(j,k)*omega_eta1new[k];
+            A_eta2new_R1 += omega_eta2new[j]*R1(j,k)*omega_eta2new[k];
+            A_eta2new_R2 += omega_eta2new[j]*R2(j,k)*omega_eta2new[k];
+            A_eta1_R1 += omega_eta1[j]*R1(j,k)*omega_eta1[k];
+            A_eta1_R2 += omega_eta1[j]*R2(j,k)*omega_eta1[k];
+            A_eta2_R1 += omega_eta2[j]*R1(j,k)*omega_eta2[k];
+            A_eta2_R2 += omega_eta2[j]*R2(j,k)*omega_eta2[k];
+            B_eta_R1 += gamma[j]*R1(j,k)*gamma[k];
+            B_eta_R2 += gamma[j]*R2(j,k)*gamma[k];
+
+        }
+    }
+    //prior density of eta1, eta2,eta1_new,eta2_new
+    double priden_eta1new=betagamma_func::pdfbeta_log(eta1_new/eta_sd,e,f);
+    double priden_eta1=betagamma_func::pdfbeta_log(eta1/eta_sd,e,f);
+    double priden_eta2new=betagamma_func::pdfbeta_log(eta2_new/eta_sd,e,f);
+    double priden_eta2=betagamma_func::pdfbeta_log(eta2/eta_sd,e,f);     
+    double MHratio_eta1=(eta1_new-eta1)*B_eta_R1+priden_eta1new-priden_eta1+mu_tilde*(sum_omega_eta1new-sum_omega_eta1)
+            +eta1_tilde*(A_eta1new_R1-A_eta1_R1)+eta2_tilde*(A_eta1new_R2-A_eta1_R2);
+    double MHratio_eta2=(eta2_new-eta2)*B_eta_R2+priden_eta2new-priden_eta2+mu_tilde*(sum_omega_eta2new-sum_omega_eta2)
+      +eta1_tilde*(A_eta2new_R1-A_eta2_R1)+eta2_tilde*(A_eta2new_R2-A_eta2_R2);
+    //double c1=std::max(0.0,eta1_new-0.01),d1=std::min(eta1_new+0.01,eta_sd);
+    //double c2=std::max(0.0,eta2_new-0.01),d2=std::min(eta2_new+0.01,eta_sd);
+    double logtrans_eta1new_eta1=log(normal_func::pdf(eta1_new,eta1,eta_sd))-log(normal_func::cdf(eta_sd,eta1,eta_sd)-normal_func::cdf(0,eta1,eta_sd));
+    double logtrans_eta1_eta1new=log(normal_func::pdf(eta1,eta1_new,eta_sd))-log(normal_func::cdf(eta_sd,eta1_new,eta_sd)-normal_func::cdf(0,eta1_new,eta_sd));
+    double logtrans_eta2new_eta2=log(normal_func::pdf(eta2_new,eta2,eta_sd))-log(normal_func::cdf(eta_sd,eta2,eta_sd)-normal_func::cdf(0,eta2,eta_sd));
+    double logtrans_eta2_eta2new=log(normal_func::pdf(eta2,eta2_new,eta_sd))-log(normal_func::cdf(eta_sd,eta2_new,eta_sd)-normal_func::cdf(0,eta2_new,eta_sd));
+    
+    double prop_eta1=logtrans_eta1_eta1new-logtrans_eta1new_eta1+mu*(sum_omega_eta1-sum_omega_eta1new)
+      +eta1*A_eta1_R1-eta1_new*A_eta1new_R1+eta2*(A_eta1_R2-A_eta1new_R2);
+    double prop_eta2=logtrans_eta2_eta2new-logtrans_eta2new_eta2+mu*(sum_omega_eta2-sum_omega_eta2new) 
+      +eta2*A_eta2_R2-eta2_new*A_eta2new_R2+eta1*(A_eta2_R1-A_eta2new_R1);
+    double logMHratio_eta1=MHratio_eta1+prop_eta1;
+    double logMHratio_eta2=MHratio_eta2+prop_eta2;
+    //br::mt19937 generator(seed);
+    //br::uniform_real_distribution< >  uniform_dist01(0.0,1.0);
+    u1=runif(0.0,1.0,generator),u2=runif(0.0,1.0,generator);
+    if (std::log(u1) < logMHratio_eta1){
+        eta1=eta1_new;
+        omega_eta1=omega_eta1new;
+    }
+    if (std::log(u2) < logMHratio_eta2){
+        eta2=eta2_new;
+        omega_eta2=omega_eta2new;
+    }
+    return List::create(
+    _["eta1"] = eta1, 
+    _["omega_eta1"] = omega_eta1,
+    _["eta2"] = eta2, 
+    _["omega_eta2"] = omega_eta2
+    );
+
+
+  }
+
+
+
+
+/*
+detect the phase transition value of eta1, eta2
+input 1-min_eta: minimum possible values of eta1, eta2, typical 0
+input 2-max_eta:maximum possible value of eta1, eta2, usuallly a large value, case by case, depends on the data 
+input 3-mu: another parameter in variant MRF of predictor variable indicator variables-gamma's
+input 4-num_rep: number of repeated sampling in gamma's to take average for final output, 10 is sufficient
+input 5 function-proppwilson_omega:perfect simulation using Propp-Wilson exact sampling with reverse order coupled Markov chain 1996
+finally using plot to check the phase transition point
+*/
+// [[Rcpp::export]]
+IntegerMatrix phase_transit_2eta(IntegerMatrix R1, IntegerMatrix R2, int T_max,double mu,double min_eta,double max_eta,unsigned int num_rep){
+   if (min_eta > max_eta) stop("input minimum eta value should be smaller than maximum eta value");
+   if (R1.ncol()!=R1.nrow()) stop("input R1 matrix must be square matrix");
+   if (R2.ncol()!=R2.nrow()) stop("input R2 matrix must be square matrix");
+   if (R1.ncol()!=R2.nrow()) stop("input R1 and R2 matrices must have same dimension");
+   unsigned int p=R1.ncol();
+   double eta_tmp=min_eta;
+   unsigned int len_eta=(max_eta-min_eta)/0.0001+1;
+   IntegerMatrix gamma_output(len_eta,num_rep);
+   IntegerVector gamma_tmp(p);
+   int gamma_tmp2;
+   
+   for (unsigned int i=0; i < (len_eta); i++){
+          for (unsigned int j=0; j < num_rep; j++){
+             gamma_tmp=proppwilson_omega(R1,R2,mu,eta_tmp,eta_tmp,T_max);
+             gamma_tmp2=0;
+             for (unsigned int k=0; k < p; k++){
+               gamma_tmp2 += gamma_tmp[k]; 
+             }
+          gamma_output(i,j)=gamma_tmp2;           
+          }     
+    eta_tmp +=0.0001;
+    }
+
+ return gamma_output;
+
+}
+/*
+List moller_2eta_unif(IntegerMatrix R1, IntegerMatrix R2, double mu, double eta1, double eta2,int T_max,
+double mu_tilde,double eta_tilde,double eta_sd,IntegerVector Gamma,double e, double f,
+Function proppwilson_omega,Function pri2eta_beta);
+RcppExport SEXP moller_2eta_unif(SEXP R1SEXP, SEXP R2SEXP, SEXP muSEXP, SEXP eta1SEXP, SEXP eta2SEXP,SEXP T_maxSEXP,
+SEXP mu_tildeSEXP,SEXP eta_tildeSEXP,SEXP eta_sdSEXP,SEXP GammaSEXP,SEXP eSEXP, SEXP fSEXP,
+SEXP proppwilson_omegaSEXP,SEXP pri2eta_betaSEXP)
+icensmis_bayesmc_pw_raw(SEXP DmSEXP, SEXP XmatSEXP, SEXP breaksSEXP, SEXP bSEXP, SEXP om1SEXP, SEXP om2SEXP, SEXP niterSEXP, SEXP psampleSEXP, SEXP initsurvSEXP, SEXP nreportSEXP, SEXP fitsurv_pwSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject __result;
+    Rcpp::RNGScope __rngScope;
+    Rcpp::traits::input_parameter< IntegerVector >::type R1(R1SEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type R2(R2SEXP);  
+    Rcpp::traits::input_parameter< double >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< double >::type eta1(eta1SEXP);
+    Rcpp::traits::input_parameter< double >::type eta2(eta2SEXP);
+    Rcpp::traits::input_parameter< int >::type T_max(T_maxSEXP);
+    Rcpp::traits::input_parameter< double >::type mu_tilde(mu_tildeSEXP);
+    Rcpp::traits::input_parameter< double >::type eta_tilde(eta_tildeSEXP);
+    Rcpp::traits::input_parameter< double >::type eta_sd(eta_sdSEXP);
+    Rcpp::traits::input_parameter< IntegerVector >::type Gamma(GammaSEXP);
+    Rcpp::traits::input_parameter< double >::type e(eSEXP);
+    Rcpp::traits::input_parameter< double >::type f(fSEXP);
+    Rcpp::traits::input_parameter< Function >::type proppwilson_omega(proppwilson_omegaSEXP);    
+   // Rcpp::traits::input_parameter< Function >::type pri2eta_beta(pri2eta_betaSEXP);
+    __result = Rcpp::wrap(bayesmc_pw_raw(Dm, Xmat, breaks, b, om1, om2, niter, psample, initsurv, nreport, fitsurv_pw));
+    return __result;
+END_RCPP
+}
+*/
+ 
+```
+
+
+
+```{r}
+#create the example adjacent matrix from biological pathway information
+#assume we know partial dependent information in fixed adjacent matrix-adj1_X
+adj1_X<-matrix(0,20,20)
+adj1_X[1,4]<-1
+adj1_X[1,5]<-1
+
+adj1_X[5,6]<-1
+
+adj1_X[2,4]<-1
+
+adj1_X[2,5]<-1
+
+adj1_X[1,3]<-1
+
+
+
+#########################################################################################
+#set up the working directory
+setwd("C:/Users/YYao/Downloads/Real Data")
+
+
+#eta1/eta_sd,eta2/eta_sd follows Beta(e,f) prior distribution
+#one adjacent matrix are estimated from full Bayesian MCMC sampling of 
+#sparse invser covariance and adjacent matrices assuming Gaussian Graphical model
+#bayanal3_FBE will take input of hyperparameters for the parameters in model setup
+#mu for gamma, beta0 for beta,alpha0 for alpha
+#nu0,sigmasq0 for sigmasqbeta
+#also input of the parameters-eta1, eta2 in variant MRF prior for gamma
+#adjacent matrices-R and R2 from differnt sources of information
+#typically one from correlation matrix of the data itself
+#another from biological information such as KEGG pathway database
+#MCMC update
+bayanal3_FBE <- function(design,y,z_dat,R,seed,file_address) {
+  #randomly generate eta1,eta2 through auxiliary variable-omega_eta1,omega_eta2
+  library(Rcpp)
+  library(BH)
+  library(RcppArmadillo)
+  #  library(RcppEigen)
+  library(MCMCpack)
+
+  
+  
+  
+  p=ncol(design)
+  #Sig=1.5*diag(p)
+  R2=1.5*diag(p)
+  
+  sourceCpp("MollerRand2eta_random.cpp")
+  ## Initialize
+  nbeta<-dim(R)[1]
+  ntau<-ncol(z_dat)
+  omega <- exp(mu)/(1+exp(mu))
+  gamma <- rbinom(nbeta, 1, omega)
+  beta <- rep(0, nbeta)
+  sigmasqbeta<-1/rgamma(1,nu0/2,sigmasq0*nu0/2)
+  sigmabeta<-sqrt(sigmasqbeta)
+  sigmaalpha<-sqrt(h*sigmasqbeta)
+  sigmasqtau<-htau*sigmasqbeta
+  sigmatau<-sqrt(sigmasqtau)
+  tau<-rnorm(ntau,tau0,sigmatau)
+  alpha<-rnorm(1,alpha0,sigmaalpha)
+  eta1=eta_sd*rbeta(1,e,f)
+  eta2=eta_sd*rbeta(1,e,f)
+  beta[gamma==1] <- rnorm(sum(gamma), beta0,sigmabeta)
+  #calculate the log posterior marginal probability at the initiazation of the parameters
+  select <- which(gamma==1)
+  select.zero<-which(gamma==0)
+  nselect <- length(select)
+  betasub <- beta[select]
+  designsub <- design[, select, drop=F]
+  z<-apply(designsub,1,function(x){return(x%*%betasub)})
+  
+  tau_zdat<-z_dat%*%tau
+  tau_z_tot<-alpha+z+tau_zdat
+  loglik <- sum(y*(tau_z_tot))-sum(log(1+exp(tau_z_tot)))
+  logtau <- -sum((tau-tau0)^2)/(2*sigmasqtau) -0.5*ntau*log(2*pi*sigmasqtau)
+  
+  logalpha<--(alpha-alpha0)^2/(2*h*sigmasqbeta)-0.5*log(2*pi*h*sigmasqbeta)
+  logbeta <- -sum((betasub-beta0)^2)/(2*sigmasqbeta) -0.5*nselect*log(2*pi*sigmasqbeta)
+  loggamma <- c(mu*nselect + t(gamma)%*%(eta1*R+eta2*R2)%*%gamma)
+  logsigmasqbeta<-log(dinvgamma(sigmasqbeta,nu0/2,sigmasq0*nu0/2))
+  ## log posterior marginal joint distribution of alpha,beta,gamma
+  logp=loglik + logbeta + loggamma+logalpha+logsigmasqbeta+logtau
+  #set the parameter vectors for MCMC interations
+  betaMC <- gammaMC <- matrix(NA, nrow=niter, ncol=nbeta)
+  alphaMC<-matrix(NA,nrow=niter,ncol=1)
+  tauMC<-matrix(NA,nrow=niter,ncol=ntau)
+  
+  sigmasqbetaMC<-matrix(NA,nrow=niter,ncol=1)
+  for (i in 1:niter) {
+  #read the MCMC samples of adjacent matrix generated from matlab code and make sure the file names are consistent
+    R2.dat<-read.table(paste(file_address,'met_p_',as.character(seed),"_cov_",as.character(i),".txt",sep="")) 
+    
+    
+    
+    R2=as.matrix(R2.dat)
+    
+    diag(R2)<-0
+    
+    for (k in 1:3) {
+      ## update main effects
+      uid <- sample(1:nbeta, 1)
+      gamma.prop <- gamma
+      gamma.prop[uid] <- 1 - gamma.prop[uid]
+      beta.prop <-  beta
+      beta.prop[uid]<-ifelse(gamma.prop[uid]==0,0,rnorm(1, beta0, sigmabeta))
+      nselect.prop<-ifelse(gamma.prop[uid]==1,nselect+1,nselect-1)
+      #difference at beta
+      logbeta.prop<-ifelse(gamma.prop[uid]==1,logbeta+log(dnorm(beta.prop[uid],beta0,sigmabeta)),
+                           logbeta-log(dnorm(beta[uid],beta0,sigmabeta)))
+      #differnece at likelihood
+      if(gamma.prop[uid]==1){
+        z.prop<-z+beta.prop[uid]*design[,uid]
+      } else {
+        z.prop<-z-beta[uid]*design[,uid]}
+      
+      
+      tau_z_tot.prop<-alpha+z.prop+tau_zdat
+      loglik.prop <- sum(y*(tau_z_tot.prop))-sum(log(1+exp(tau_z_tot.prop)))
+      
+      
+      #difference at gamma
+      loggamma.prop<-ifelse(gamma.prop[uid]==1,
+                            loggamma+mu+sum(gamma.prop*(eta1*R[,uid]+eta2*R2[,uid]))+sum(gamma.prop*(eta1*R[uid,]+eta2*R2[uid,])),
+                            loggamma-mu-sum(gamma*(eta1*R[,uid]+eta2*R2[,uid]))-sum(gamma*(eta1*R[uid,]+eta2*R2[uid,])))
+      #difference at log-posterior marginal probability
+      logp.prop<-logbeta.prop+ loglik.prop +loggamma.prop+logalpha+logsigmasqbeta+logtau
+      AAA <- logp.prop - logp
+      +ifelse(gamma.prop[uid]==0, log(dnorm(beta[uid], beta0,sigmabeta)), -log(dnorm(beta.prop[uid], beta0,sigmabeta)))
+      if (log(runif(1)) < AAA) {
+        gamma <- gamma.prop
+        beta <- beta.prop
+        logp <- logp.prop
+        z<-z.prop
+        tau_z_tot<- tau_z_tot.prop
+        loglik<-loglik.prop
+        logbeta<-logbeta.prop
+        loggamma<-loggamma.prop
+        nselect<-nselect.prop
+      }
+      ##################################################################################################
+      include <- which(gamma==1)
+      ninclude <- length(include)
+      ## update regressional coefficients, update them one by one
+      for (j in include) {
+        beta.prop <- beta
+        beta.prop[j] <- rnorm(1, beta[j], sigmabeta)
+        #difference at beta
+        logbeta.prop<-logbeta-(beta.prop[j]-beta0)^2/(2*sigmasqbeta)+(beta[j]-beta0)^2/(2*sigmasqbeta)
+        #differnece at likelihood
+        z.prop<-z+(beta.prop[j]-beta[j])*design[,j,drop=F]
+        
+        tau_z_tot.prop<-alpha+z.prop+tau_zdat
+        loglik.prop <- sum(y*(tau_z_tot.prop))-sum(log(1+exp(tau_z_tot.prop)))
+        
+        #difference at log-posterior marginal probability
+        logp.prop<-logbeta.prop+loglik.prop+loggamma+logalpha+logsigmasqbeta+logtau
+        AAA <- logp.prop - logp
+        if (log(runif(1)) < AAA) {
+          beta <- beta.prop
+          logp <- logp.prop
+          logbeta<-logbeta.prop
+          loglik<-loglik.prop
+          z<-z.prop
+          tau_z_tot<-tau_z_tot.prop
+        }
+        
+      }
+      
+    }
+    #update eta1, eta2
+    list_test2<-moller_2eta_trnormal(R, R2,  mu, eta1, eta2,Tmax,
+                                     mu_tilde,eta1_tilde,eta2_tilde,eta_sd,gamma,e,f)
+    eta1<-unlist(list_test2["eta1"])
+    eta2<-unlist(list_test2["eta2"])
+    loggamma= c(mu*sum(gamma==1) + t(gamma)%*%(eta1*R+eta2*R2)%*%gamma)
+    logp=loglik + logbeta + loggamma+logalpha+logsigmasqbeta+logtau
+    
+    
+    ## update alpha
+    alpha.prop <- rnorm(1,alpha,sigmaalpha)
+    
+    tau_z_tot.prop<-alpha.prop+z+tau_zdat
+    loglik.prop <- sum(y*(tau_z_tot.prop))-sum(log(1+exp(tau_z_tot.prop)))
+    
+    
+    
+    
+    logalpha.prop<-logalpha-(alpha.prop-alpha0)^2/(2*h*sigmasqbeta)+(alpha-alpha0)^2/(2*h*sigmasqbeta)
+    logp.prop<-loglik.prop+logalpha.prop+loggamma+logbeta+logsigmasqbeta+logtau
+    AAA <- logp.prop - logp
+    if (log(runif(1)) < AAA) {
+      alpha <- alpha.prop
+      logp <- logp.prop
+      loglik<-loglik.prop
+      logalpha<-logalpha.prop
+      tau_z_tot<-tau_z_tot.prop
+      
+    }
+    
+    ## update tau
+    # alpha.prop <- rnorm(1,alpha,sigmaalpha)
+    tau.prop<-rnorm(ntau,tau,sigmatau)
+    tau_zdat.prop<-z_dat%*%tau.prop
+    tau_z_tot.prop<-alpha+z+tau_zdat.prop
+    loglik.prop <- sum(y*(tau_z_tot.prop))-sum(log(1+exp(tau_z_tot.prop)))
+    #logalpha.prop<-logalpha-(alpha.prop-alpha0)^2/(2*h*sigmasqbeta)+(alpha-alpha0)^2/(2*h*sigmasqbeta)
+    
+    
+    logtau.prop <- logtau+sum((tau-tau0)^2)/(2*sigmasqtau)-sum((tau.prop-tau0)^2)/(2*sigmasqtau) 
+    
+    
+    
+    logp.prop<-loglik.prop+logalpha+loggamma+logbeta+logsigmasqbeta+logtau.prop
+    
+    
+    AAA <- logp.prop - logp
+    if (log(runif(1)) < AAA) {
+      # alpha <- alpha.prop
+      tau<-tau.prop
+      tau_zdat<-tau_zdat.prop
+      tau_z_tot<-tau_z_tot.prop
+      logp <- logp.prop
+      loglik<-loglik.prop
+      # logalpha<-logalpha.prop
+      logtau<-logtau.prop
+      
+    }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    ##update sigmasqbeta
+    sigmasqbeta.prop<-exp(-rnorm(1,-log(sigmasqbeta),1))
+    logsigmasqbeta.prop=log(dinvgamma(sigmasqbeta.prop,nu0/2,sigmasq0*nu0/2))
+    
+    
+    
+    logalpha.prop<--(alpha-alpha0)^2/(2*h*sigmasqbeta.prop)-0.5*log(2*pi*h*sigmasqbeta.prop)
+    
+    sigmasqtau.prop<-htau*sigmasqbeta.prop
+    sigmatau.prop<-sqrt(sigmasqtau.prop)
+    
+    
+    logtau.prop<- -sum((tau-tau0)^2)/(2*sigmasqtau.prop) -0.5*ntau*log(2*pi*sigmasqtau.prop)
+    
+    
+    
+    betasub<- beta[which(gamma==1)]
+    logbeta.prop <- -sum((betasub-beta0)^2)/(2*sigmasqbeta.prop) -0.5*nselect*log(2*pi*sigmasqbeta.prop)
+    logp.prop<-logbeta.prop+loglik+loggamma+logalpha.prop+logsigmasqbeta.prop+logtau.prop
+    AAA <- logp.prop - logp
+    if (log(runif(1)) < AAA) {
+      sigmasqbeta <- sigmasqbeta.prop
+      sigmabeta<-sqrt(sigmasqbeta.prop)
+      sigmaalpha<-sqrt(h*sigmasqbeta.prop)
+      
+      sigmasqtau<-sigmasqtau.prop
+      sigmatau<-sigmatau.prop
+      logp <- logp.prop
+      logalpha<-logalpha.prop
+      logbeta<-logbeta.prop
+      logsigmasqbeta<- logsigmasqbeta.prop
+      logtau<-logtau.prop
+      
+    }
+    
+    
+    
+    ## Store chains
+    betaMC[i, ] <- beta
+    gammaMC[i, ] <- gamma
+    alphaMC[i,]<-alpha
+    sigmasqbetaMC[i,]<-sigmasqbeta
+    
+  }
+  parms <- list(design=design,y=y, mu=mu, nu0=nu0,sigmasq0=sigmasq0,e=e,f=f,eta_sd=eta_sd,alpha0=alpha0,tau0=tau0,beta0=beta0,R=R,h=h,htau=htau, niter=niter)
+  list(parms=parms, betaMC=betaMC, alphaMC=alphaMC,tauMC=tauMC, gammaMC=gammaMC,sigmasqbetaMC=sigmasqbetaMC)
+}
+
+set.seed(202307)
+
+nu0=2
+sigmasq0=10
+h=1.5
+htau=2
+mu=-log(1/0.5-1)
+e<-2
+f<-1
+eta_sd=0.5
+alpha0=0
+tau0=0
+beta0=0
+
+Tmax=64
+mu_tilde=-4.9
+eta1_tilde=0.1
+eta2_tilde=0.1
+options(scipen=999)
+niter=1000
+
+file_address="C:/Users/YYao/Downloads/Real Data/"
+#run MCMC sampling of our Bayesian variable selection method 
+mc_test_p20_dat<-bayanal3_FBE(design=X,y=y,z_dat=matrix(Z_dat,ncol=1),seed=512,file_address=file_address,R=adj1_X)
+
+#mean inclusion probability of the variable selection indicator-gamma
+apply(mc_test_p20_dat[[5]][401:1000,],2, function(x){sum(x)/(niter-400)})
+
+#select those variables with mean inclusion probability of the variable selection indicator-gamma greater than cutoff value of 0.5
+sum(apply(mc_test_p20_dat[[5]][401:1000,],2, function(x){sum(x)/(niter-400)})>0.5)
+
+
+
+```
+
+
+## Contact Us / Contribute
+Our program for this Bayesian variable selection method is new, and any  suggestions are welcomed. You can use GitHub to raise issues, contribute, or communicate with us about the code:
+
+https://github.com/yuy113/BVSDEP2ADJ.io
+
+## Reference
+
+H. Wang. Scaling it up: stochastic search structure learning in graphical models. Bayesian
+Analysis, 10(2):351–377, 2015.
+
+J. Møller, A. N. Pettitt, R. Reeves, and K. K. Berthelsen. An efficient markov chain monte carlo
+method for distributions with intracable normalising constants. Biometrika, 93(2):451–458,
+2006.
+
+F.C. Stingo, Y. Chen, M. G. Tadesse, and M. Vannucci. Incorporating biological information
+into linear models: a bayesian approach to the selection of pathways and genes. Annals of
+Applied Statistics, 5(3):1978–2002, 2011.
