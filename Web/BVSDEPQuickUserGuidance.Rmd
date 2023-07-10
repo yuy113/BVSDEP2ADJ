@@ -100,14 +100,23 @@ In our Bayesian variable selection method, following Wang et al. (2014), we prod
 We recommend trying Matlab Online by accessing the following URL: \url{https://matlab.mathworks.com/}. Copy the function `BayesGGM_SSVS_FixedV0V1_mod` and the $X$ data in TXT format, generated above in R software, along with the code that implements MCMC sampling of the inverse covariance and adjacency matrices of the predictors, into the same folder. 
 
 To execute the function `BayesGGM_SSVS_FixedV0V1_mod` in Matlab, provide the following input parameters:
+
 - `S`: Cross-product matrix of the observed predictor data ($XX^T$).
+
 - `n`: Number of observations.
+
 - `Sig`: Initial guess of the standard deviation ($\sigma$) for assumed normal distribution of the predictors.
+
 - `V0`: Initial small variance component of the predictors.
+
 - `V1`: Initial large variance component of the predictors.
+
 - $\lambda$: Hyperparameter for the diagonal elements of the inverse covariance matrix of the predictors (usually set to 1).
+
 - `pii`: Prior marginal edge inclusion probability.
+
 - `burnin`: Number of posterior samples during the burn-in period.
+
 - `nmc`: Number of posterior samples to be saved.
 
 Running the function will generate `nmc` posterior samples of the adjacency matrix in TXT format, which represent the dependent structure information of the predictors ($X$) obtained from the observed data.
